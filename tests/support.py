@@ -174,7 +174,6 @@ def defaults():
     cfg["router_config"]["router_provider"] = "router"
     for tier in ("low", "mid", "high"):
         cfg[f"tier_{tier}"]["global_provider"] = f"{tier}-provider"
-        cfg[f"tier_{tier}"]["global_model"] = f"{tier}-model"
     return cfg
 
 

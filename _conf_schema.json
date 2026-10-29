@@ -22,15 +22,9 @@
             },
             "router_provider": {
                 "type": "string",
-                "description": "路由模型服务商 (Router Provider)",
-                "hint": "负责分析用户意图并分发任务，建议使用快速的小模型。",
+                "description": "路由模型 (Chat Provider)",
+                "hint": "选择负责分析意图的完整 Chat Provider 条目，例如 minimax-token-plan/MiniMax-M3.1-Flash；该条目已包含具体模型，无需另填模型名。建议使用快速的小模型。",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "router_model": {
-                "type": "string",
-                "description": "路由模型名称 (Router Model)",
-                "hint": "指定路由使用的具体模型名称 (如 gemini-2.5-flash-lite)。留空则使用服务商默认模型。",
                 "default": ""
             },
             "router_manual_prompt": {
@@ -66,14 +60,9 @@
             },
             "global_provider": {
                 "type": "string",
-                "description": "【兜底】默认模型服务商 (Global Provider)",
-                "hint": "当用户意图匹配到此 Tier，但没有命中下方的任何具体规则 (r1-r6) 时，使用的备用模型。对于 Low Tier，建议配置一个极速且便宜的模型。",
+                "description": "【兜底】默认模型 (Chat Provider)",
+                "hint": "选择此等级的默认 Chat Provider（已包含具体模型）。没有命中分类专属配置时使用；留空则不干预 AstrBot 默认模型。",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "global_model": {
-                "type": "string",
-                "description": "【兜底】默认模型名称 (Global Model)",
                 "default": ""
             },
             "r1_name": {
@@ -90,14 +79,9 @@
             },
             "r1_provider": {
                 "type": "string",
-                "description": "规则 1 - 指定服务商",
-                "hint": "命中此规则时使用的模型服务商。",
+                "description": "规则 1 - 指定模型 (Chat Provider)",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r1_model": {
-                "type": "string",
-                "description": "规则 1 - 指定模型名",
                 "default": ""
             },
             "r2_name": {
@@ -114,14 +98,10 @@
             },
             "r2_provider": {
                 "type": "string",
-                "description": "规则 2 - 指定服务商",
+                "description": "规则 2 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r2_model": {
-                "type": "string",
-                "description": "规则 2 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r3_name": {
                 "type": "string",
@@ -137,14 +117,10 @@
             },
             "r3_provider": {
                 "type": "string",
-                "description": "规则 3 - 指定服务商",
+                "description": "规则 3 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r3_model": {
-                "type": "string",
-                "description": "规则 3 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r4_name": {
                 "type": "string",
@@ -160,14 +136,10 @@
             },
             "r4_provider": {
                 "type": "string",
-                "description": "规则 4 - 指定服务商",
+                "description": "规则 4 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r4_model": {
-                "type": "string",
-                "description": "规则 4 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r5_name": {
                 "type": "string",
@@ -182,14 +154,10 @@
             },
             "r5_provider": {
                 "type": "string",
-                "description": "自定义规则 1 - 指定服务商",
+                "description": "规则 5 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r5_model": {
-                "type": "string",
-                "description": "自定义规则 1 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r6_name": {
                 "type": "string",
@@ -204,14 +172,10 @@
             },
             "r6_provider": {
                 "type": "string",
-                "description": "自定义规则 2 - 指定服务商",
+                "description": "规则 6 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r6_model": {
-                "type": "string",
-                "description": "自定义规则 2 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             }
         }
     },
@@ -227,14 +191,9 @@
             },
             "global_provider": {
                 "type": "string",
-                "description": "【兜底】默认模型服务商 (Global Provider)",
-                "hint": "Mid Tier 的默认模型。建议使用能力均衡的模型。",
+                "description": "【兜底】默认模型 (Chat Provider)",
+                "hint": "选择此等级的默认 Chat Provider（已包含具体模型）。没有命中分类专属配置时使用；留空则不干预 AstrBot 默认模型。",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "global_model": {
-                "type": "string",
-                "description": "【兜底】默认模型名称 (Global Model)",
                 "default": ""
             },
             "r1_name": {
@@ -249,14 +208,10 @@
             },
             "r1_provider": {
                 "type": "string",
-                "description": "规则 1 - 指定服务商",
+                "description": "规则 1 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r1_model": {
-                "type": "string",
-                "description": "规则 1 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r2_name": {
                 "type": "string",
@@ -270,14 +225,10 @@
             },
             "r2_provider": {
                 "type": "string",
-                "description": "规则 2 - 指定服务商",
+                "description": "规则 2 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r2_model": {
-                "type": "string",
-                "description": "规则 2 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r3_name": {
                 "type": "string",
@@ -291,14 +242,10 @@
             },
             "r3_provider": {
                 "type": "string",
-                "description": "规则 3 - 指定服务商",
+                "description": "规则 3 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r3_model": {
-                "type": "string",
-                "description": "规则 3 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r4_name": {
                 "type": "string",
@@ -312,14 +259,10 @@
             },
             "r4_provider": {
                 "type": "string",
-                "description": "规则 4 - 指定服务商",
+                "description": "规则 4 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r4_model": {
-                "type": "string",
-                "description": "规则 4 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r5_name": {
                 "type": "string",
@@ -333,14 +276,10 @@
             },
             "r5_provider": {
                 "type": "string",
-                "description": "自定义规则 1 - 指定服务商",
+                "description": "规则 5 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r5_model": {
-                "type": "string",
-                "description": "自定义规则 1 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r6_name": {
                 "type": "string",
@@ -354,14 +293,10 @@
             },
             "r6_provider": {
                 "type": "string",
-                "description": "自定义规则 2 - 指定服务商",
+                "description": "规则 6 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r6_model": {
-                "type": "string",
-                "description": "自定义规则 2 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             }
         }
     },
@@ -371,14 +306,9 @@
         "items": {
             "global_provider": {
                 "type": "string",
-                "description": "【兜底】默认模型服务商 (Global Provider)",
-                "hint": "High Tier 的默认模型。建议使用最强模型。",
+                "description": "【兜底】默认模型 (Chat Provider)",
+                "hint": "选择此等级的默认 Chat Provider（已包含具体模型）。没有命中分类专属配置时使用；留空则不干预 AstrBot 默认模型。",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "global_model": {
-                "type": "string",
-                "description": "【兜底】默认模型名称 (Global Model)",
                 "default": ""
             },
             "r1_name": {
@@ -393,14 +323,10 @@
             },
             "r1_provider": {
                 "type": "string",
-                "description": "规则 1 - 指定服务商",
+                "description": "规则 1 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r1_model": {
-                "type": "string",
-                "description": "规则 1 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r2_name": {
                 "type": "string",
@@ -414,14 +340,10 @@
             },
             "r2_provider": {
                 "type": "string",
-                "description": "规则 2 - 指定服务商",
+                "description": "规则 2 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r2_model": {
-                "type": "string",
-                "description": "规则 2 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r3_name": {
                 "type": "string",
@@ -435,14 +357,10 @@
             },
             "r3_provider": {
                 "type": "string",
-                "description": "规则 3 - 指定服务商",
+                "description": "规则 3 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r3_model": {
-                "type": "string",
-                "description": "规则 3 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r4_name": {
                 "type": "string",
@@ -456,14 +374,10 @@
             },
             "r4_provider": {
                 "type": "string",
-                "description": "规则 4 - 指定服务商",
+                "description": "规则 4 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r4_model": {
-                "type": "string",
-                "description": "规则 4 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r5_name": {
                 "type": "string",
@@ -477,14 +391,10 @@
             },
             "r5_provider": {
                 "type": "string",
-                "description": "自定义规则 1 - 指定服务商",
+                "description": "规则 5 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r5_model": {
-                "type": "string",
-                "description": "自定义规则 1 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             },
             "r6_name": {
                 "type": "string",
@@ -498,14 +408,10 @@
             },
             "r6_provider": {
                 "type": "string",
-                "description": "自定义规则 2 - 指定服务商",
+                "description": "规则 6 - 指定模型 (Chat Provider)",
                 "_special": "select_provider",
-                "default": ""
-            },
-            "r6_model": {
-                "type": "string",
-                "description": "自定义规则 2 - 指定模型名",
-                "default": ""
+                "default": "",
+                "hint": "选择命中分类时使用的完整 Chat Provider 条目；无需另填模型名。留空则使用本等级的默认 Chat Provider。"
             }
         }
     },

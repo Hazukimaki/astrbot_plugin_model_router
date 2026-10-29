@@ -45,12 +45,19 @@ class IntentRouter:
     def _get_cache_key(self, text: str, contexts: List, task_snapshots: List = None) -> str:
         """Include every input that can change the routing decision."""
         turns = max(0, self.config.get("router_config", {}).get("context_turns", 4))
+        # Old saved model-name overrides are intentionally inert, including in
+        # the cache key. Only the selected Chat Provider determines the model.
+        retired_keys = {"router_model", "global_model"} | {f"r{i}_model" for i in range(1, 7)}
+        effective_config = {
+            section: {key: value for key, value in self.config.get(section, {}).items()
+                      if key not in retired_keys}
+            for section in ("router_config", "tier_low", "tier_mid", "tier_high")
+        }
         payload = {
             "text": text,
             "contexts": self._prepare_contexts(contexts),
             "task_snapshots": (task_snapshots or []) if turns > 0 else [],
-            "config": {key: self.config.get(key, {}) for key in
-                       ("router_config", "tier_low", "tier_mid", "tier_high")},
+            "config": effective_config,
         }
         serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -94,13 +101,12 @@ class IntentRouter:
         
         router_config = self.config.get("router_config", {})
         provider_id = router_config.get("router_provider")
-        router_model = router_config.get("router_model", "")
         
         contexts = self._prepare_contexts(contexts)
         if router_config.get("context_turns", 4) <= 0:
             task_snapshots = []
         
-        logger.debug(f"Router Config: Provider={provider_id}, Model={router_model}")
+        logger.debug(f"Router Config: Chat Provider={provider_id}")
 
         if not provider_id:
              logger.warning("Router provider ID is empty.")
@@ -254,8 +260,7 @@ For user-defined categories, follow general principles:
             logger.debug("Sending request to Router Model...")
             response = await provider.text_chat(
                 prompt=f"{system_prompt}\n\n{prompt}",
-                contexts=[],
-                model=router_model if router_model else None
+                contexts=[]
             )
             
             raw_text = response.completion_text.strip()

@@ -64,13 +64,13 @@ class ParsingAndProviders(unittest.IsolatedAsyncioTestCase):
         cfg["router_config"]["router_model"] = "offline-router-model"
         plugin, _, provider, _ = fixture(cfg)
         await plugin.router.analyze_intent("input")
-        self.assertEqual(provider.text_chat.await_args.kwargs["model"], "offline-router-model")
+        self.assertNotIn("model", provider.text_chat.await_args.kwargs)
         self.assertEqual(provider.text_chat.await_args.kwargs["contexts"], [])
 
     async def test_blank_model_uses_provider_default(self):
         plugin, _, provider, _ = fixture()
         await plugin.router.analyze_intent("input")
-        self.assertIsNone(provider.text_chat.await_args.kwargs["model"])
+        self.assertNotIn("model", provider.text_chat.await_args.kwargs)
 
 
 class CacheTests(unittest.IsolatedAsyncioTestCase):
@@ -138,20 +138,22 @@ class TierTests(unittest.TestCase):
             with self.subTest(score=score):
                 self.assertEqual(
                     plugin.get_target_config("unknown", score),
-                    (f"{tier}-provider", f"{tier}-model", tier),
+                    (f"{tier}-provider", tier),
                 )
 
     def test_category_overrides_global_and_casefolds(self):
         cfg = defaults()
-        cfg["tier_low"].update(r1_name="CoDe", r1_provider="specific", r1_model="specific-model")
+        cfg["tier_low"].update(r1_name="CoDe", r1_provider="specific")
+        cfg["tier_low"]["r1_model"] = "specific-model"
         plugin, _, _, _ = fixture(cfg)
-        self.assertEqual(plugin.get_target_config("code", 2), ("specific", "specific-model", "low"))
+        self.assertEqual(plugin.get_target_config("code", 2), ("specific", "low"))
 
     def test_sixth_slot_supported(self):
         cfg = defaults()
-        cfg["tier_mid"].update(r6_name="custom", r6_provider="six", r6_model="six-model")
+        cfg["tier_mid"].update(r6_name="custom", r6_provider="six")
+        cfg["tier_mid"]["r6_model"] = "six-model"
         plugin, _, _, _ = fixture(cfg)
-        self.assertEqual(plugin.get_target_config("custom", 5), ("six", "six-model", "mid"))
+        self.assertEqual(plugin.get_target_config("custom", 5), ("six", "mid"))
 
     def test_first_matching_category_wins(self):
         cfg = defaults()
@@ -161,23 +163,24 @@ class TierTests(unittest.TestCase):
 
     def test_unknown_category_uses_tier_global(self):
         plugin, _, _, _ = fixture()
-        self.assertEqual(plugin.get_target_config("missing", 5), ("mid-provider", "mid-model", "mid"))
+        self.assertEqual(plugin.get_target_config("missing", 5), ("mid-provider", "mid"))
 
     def test_blank_rule_provider_uses_tier_global(self):
         cfg = defaults()
-        cfg["tier_low"].update(r1_name="math", r1_provider="", r1_model="ignored-orphan-model")
+        cfg["tier_low"].update(r1_name="math", r1_provider="")
+        cfg["tier_low"]["r1_model"] = "ignored-orphan-model"
         plugin, _, _, _ = fixture(cfg)
-        self.assertEqual(plugin.get_target_config("math", 2), ("low-provider", "low-model", "low"))
+        self.assertEqual(plugin.get_target_config("math", 2), ("low-provider", "low"))
 
     def test_missing_tier_returns_empty_selection(self):
         cfg = defaults()
         del cfg["tier_high"]
         plugin, _, _, _ = fixture(cfg)
-        self.assertEqual(plugin.get_target_config("code", 8), ("", "", "high"))
+        self.assertEqual(plugin.get_target_config("code", 8), ("", "high"))
 
     def test_fallback_helper(self):
         plugin, _, _, _ = fixture()
-        self.assertEqual(plugin.get_fallback_config("low"), ("low-provider", "low-model"))
+        self.assertEqual(plugin.get_fallback_config("low"), "low-provider")
 
 
 class EventTests(unittest.IsolatedAsyncioTestCase):
@@ -229,7 +232,8 @@ class EventTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_real_analysis_sets_selection(self):
         _, event = await self.gate(allowed=True)
-        self.assertEqual(event.get_extra("selected_model"), "low-model")
+        self.assertEqual(event.get_extra("selected_provider"), "low-provider")
+        self.assertNotIn("selected_model", event.extras)
 
     async def test_blank_target_leaves_existing_default_untouched(self):
         cfg = defaults()
@@ -265,7 +269,7 @@ class EventTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_empty_target_model_does_not_force_model(self):
         cfg = defaults()
-        cfg["tier_low"]["global_model"] = ""
+        cfg["tier_low"]["global_model"] = "legacy-model"
         plugin, _, _, _ = fixture(cfg)
         event = Event()
         await plugin.pre_route_message(event)

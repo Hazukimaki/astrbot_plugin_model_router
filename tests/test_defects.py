@@ -18,15 +18,15 @@ class DefectContracts(unittest.IsolatedAsyncioTestCase):
         cfg = defaults()
         cfg["tier_low"]["max_score"] = 5
         plugin, _, _, _ = fixture(cfg)
-        actual = plugin.get_target_config("unknown", 4)
-        self.assertEqual(actual[2], "low", "D1: configured low max_score=5 ignored at score=4")
+        provider, tier = plugin.get_target_config("unknown", 4)
+        self.assertEqual(tier, "low", "D1: configured low max_score=5 ignored at score=4")
 
     async def test_D1b_custom_mid_max_score_must_apply(self):
         cfg = defaults()
         cfg["tier_mid"]["max_score"] = 8
         plugin, _, _, _ = fixture(cfg)
-        actual = plugin.get_target_config("unknown", 7)
-        self.assertEqual(actual[2], "mid", "D1: configured mid max_score=8 ignored at score=7")
+        provider, tier = plugin.get_target_config("unknown", 7)
+        self.assertEqual(tier, "mid", "D1: configured mid max_score=8 ignored at score=7")
 
     async def test_D2_manual_prompt_valid_categories_must_be_replaced(self):
         cfg = defaults()

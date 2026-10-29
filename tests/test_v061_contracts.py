@@ -7,7 +7,7 @@ Covers:
 - Context turns = 0 skipping conversation history read & omitting old snapshots
 - Context max chars = 500, 0, 50 applying to both dict and str histories
 - All effective contexts (not just last two) participating in cache key
-- Cache invalidation on task_snapshots content/id changes and router/model/provider config changes
+- Cache invalidation on task_snapshots content/id changes and router provider config changes
 - Conservative fallback on invalid JSON and provider exceptions
 """
 import copy
@@ -40,14 +40,13 @@ class ThresholdContractTests(unittest.TestCase):
         ]
         for score, expected_tier in test_cases:
             with self.subTest(score=score, expected_tier=expected_tier):
-                provider, model, tier = plugin.get_target_config("chat", score)
+                provider, tier = plugin.get_target_config("chat", score)
                 self.assertEqual(
                     tier,
                     expected_tier,
                     f"Score {score} with low=2, mid=7 should route to {expected_tier}, got {tier}",
                 )
                 self.assertEqual(provider, f"{expected_tier}-provider")
-                self.assertEqual(model, f"{expected_tier}-model")
 
     def test_default_thresholds_low3_mid7(self):
         """Default threshold requirement: low=3, mid=7 across full 1-9 scale."""
@@ -66,14 +65,13 @@ class ThresholdContractTests(unittest.TestCase):
         ]
         for score, expected_tier in test_cases:
             with self.subTest(score=score, expected_tier=expected_tier):
-                provider, model, tier = plugin.get_target_config("unknown", score)
+                provider, tier = plugin.get_target_config("unknown", score)
                 self.assertEqual(
                     tier,
                     expected_tier,
                     f"Score {score} with default low=3, mid=7 should route to {expected_tier}, got {tier}",
                 )
                 self.assertEqual(provider, f"{expected_tier}-provider")
-                self.assertEqual(model, f"{expected_tier}-model")
 
 
 class ContextHistoryContractTests(unittest.IsolatedAsyncioTestCase):
@@ -231,20 +229,19 @@ class CacheContractTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_cache_invalidated_on_router_config_model_or_provider_change(self):
-        """Changing router model, router provider, or tier routing config must invalidate cache."""
+        """Changing router provider must invalidate cache, but legacy router_model must be inert."""
         cfg1 = defaults()
-        cfg1["router_config"]["router_model"] = "model-alpha"
         plugin1, _, provider1, _ = fixture(cfg1)
         key1 = plugin1.router._get_cache_key("test input", [])
 
-        # Model changed
+        # Legacy model changed -> ignored in cache key
         cfg2 = copy.deepcopy(cfg1)
         cfg2["router_config"]["router_model"] = "model-beta"
         plugin2, _, _, _ = fixture(cfg2)
         key2 = plugin2.router._get_cache_key("test input", [])
-        self.assertNotEqual(key1, key2, "Cache key must differ when router_model changes")
+        self.assertEqual(key1, key2, "Cache key must remain identical when legacy router_model changes")
 
-        # Provider changed
+        # Provider changed -> alters cache key
         cfg3 = copy.deepcopy(cfg1)
         cfg3["router_config"]["router_provider"] = "different-router-provider"
         plugin3, _, _, _ = fixture(cfg3)

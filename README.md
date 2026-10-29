@@ -8,6 +8,22 @@
 
 ## 📋 更新日志 (Changelog)
 
+### v0.6.2 (2026-10-29)
+
+#### 🐛 适配统一的 Chat Provider 模型选择
+
+- **删除全部 22 个重复模型名输入框**：路由模型的 `router_model`（1 个）、Low/Mid/High 的 `global_model`（3 个）以及各等级 `r1_model`～`r6_model`（18 个）。保留全部 22 个 Chat Provider 下拉选择器。
+- **不再二次覆盖模型**：路由分析直接调用选中的 Chat Provider，不传单独的 `model` 参数；目标路由仅注入完整 `selected_provider`，不再生成 `selected_model` 覆盖。像 `minimax-token-plan/MiniMax-M3.1-Flash` 的选择值原样传递，不拆分或拼接。
+- **实际选择与展示一致**：`/router status`、`/router config`、日志及调试消息改为显示完整 Chat Provider ID；配置表显示真实等级兜底目标，即使没有分类规则也能查看。
+- **兼容旧配置**：旧文件中残留的 `router_model`、`global_model`、`r1_model`～`r6_model` 被忽略，不再影响调用、路由、展示或缓存；不强制删除用户配置文件中的旧字段，不改动已有阈值、名单和 provider 选择。
+- **版本与验证**：插件注册、元数据及状态命令统一为 **0.6.2**；迁移并补充 provider-only 配置、调用、分类兜底、调试展示和旧配置兼容的离线回归测试，**共 89 项通过，0 失败、0 错误、0 跳过**，保留 v0.6.1 的五类问题回归。
+
+#### ⚠️ 升级说明
+
+- 现在只需在每个下拉框选择包含目标模型的 **Chat Provider**，无需另填模型名；如需更换模型，请选择另一个 Chat Provider 条目，或在 AstrBot 中管理该条目的模型。
+- 如果旧配置依赖独立模型名覆盖，请在升级后重新选择对应目标模型的 Chat Provider；插件不会猜测新 ID 或自动创建服务商。
+- 更新并重载插件后刷新配置页面，确认重复输入框已消失；执行 `/router status` 确认 **0.6.2**。本次不自动部署或重载服务器，真实 AstrBot UI/模型调用仍需在测试会话验证。
+
 ### v0.6.1 (2026-10-29)
 
 #### 🐛 问题修复
@@ -73,8 +89,7 @@
 | 配置项 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `plugin_enabled` | bool | `true` | 插件总开关。 |
-| `router_config.router_provider` | string | - | **(必须)** 负责分析意图的路由模型服务商。建议使用响应快、便宜的小模型。 |
-| `router_config.router_model` | string | - | 指定路由使用的具体模型名称 (留空则用默认)。 |
+| `router_config.router_provider` | string | - | **(必须)** 负责分析意图的完整 Chat Provider 条目（已包含具体模型），例如 `minimax-token-plan/MiniMax-M3.1-Flash`。建议使用响应快、便宜的小模型。 |
 | `router_config.debug_mode` | bool | `false` | 开启后，会在控制台或指定会话显示详细的路由分析日志。 |
 | `router_config.context_turns` | int | `4` | 路由判断时参考的对话轮数 (1轮=一问一答)，同时控制任务快照的有效期。0 表示仅当前消息、不使用历史或旧任务快照。 |
 | `router_config.debug_target_sid` | string | 空 | 指定接收调试信息的会话；留空只记录日志，不在当前会话追加发送。 |
@@ -87,9 +102,9 @@
 
 | 等级 | 适用场景 | 关键配置 |
 | :--- | :--- | :--- |
-| **🟢 Low Tier** | 闲聊、简单指令、单一工具调用 | **Max Score (默认3)**: 分数 <= 此值进入 Low Tier。<br>**Global Model**: 此等级的默认模型。<br>**Rules (r1-r6)**: 针对特定分类 (如 math, chat) 指定模型。 |
-| **🟡 Mid Tier** | 一般逻辑、多步任务、文档摘要 | **Max Score (默认7)**: 分数 <= 此值 (且 > Low) 进入 Mid Tier。<br>**Global Model**: 此等级的默认模型。 |
-| **🔴 High Tier** | 复杂代码、深度推理、创意写作 | **Global Model**: 此等级的默认模型 (通常配置为最强模型)。<br>**Rules (r1-r6)**: 同样可针对分类指定模型。 |
+| **🟢 Low Tier** | 闲聊、简单指令、单一工具调用 | **Max Score (默认3)**: 分数 <= 此值进入 Low Tier。<br>**Global Provider（已包含模型）**: 此等级的默认模型。<br>**Rules (r1-r6)**: 针对特定分类 (如 math, chat) 指定模型。 |
+| **🟡 Mid Tier** | 一般逻辑、多步任务、文档摘要 | **Max Score (默认7)**: 分数 <= 此值 (且 > Low) 进入 Mid Tier。<br>**Global Provider（已包含模型）**: 此等级的默认模型。 |
+| **🔴 High Tier** | 复杂代码、深度推理、创意写作 | **Global Provider（已包含模型）**: 此等级的默认模型 (通常配置为最强模型)。<br>**Rules (r1-r6)**: 同样可针对分类指定模型。 |
 
 **实际分档公式**：`score <= low.max_score` → Low；`low.max_score < score <= mid.max_score` → Mid；`score > mid.max_score` → High。建议满足 `1 <= Low Max Score < Mid Max Score <= 9`。
 
@@ -107,8 +122,9 @@
 每个 Tier 下可以配置 r1 到 r6 六组规则，每组规则包含：
 *   `name`: 识别键名 (如 `code`)，对应路由模型分析出的 `category`。
 *   `desc`: 意图定义 (如 `Programming tasks`)，会注入到路由模型的 Prompt 中。
-*   `provider`: 命中该分类时使用的服务商。
-*   `model`: 命中该分类时使用的模型名。
+*   `provider`: 命中该分类时使用的完整 Chat Provider 条目，已包含具体模型。留空使用该等级的 `global_provider`；等级默认项也留空则不干预 AstrBot 默认模型。
+
+例如选择 `minimax-token-plan/MiniMax-M3.1-Flash` 后，不需要再填写 `MiniMax-M3.1-Flash`；v0.6.2 起已删除所有独立模型名输入框。原来填在 `router_model`、`global_model` 或 `rN_model` 中的值不再生效，如需保留原目标，请在 Chat Provider 下拉框选择对应模型。
 
 ### 3. 会话控制 (Session Control)
 
@@ -146,9 +162,10 @@ python -B -m unittest discover -s tests -v
 ### 更新后的服务端核验
 
 1. 备份插件配置，在测试实例中更新至此版本，确认代码来源是自己的 fork/修复分支。
-2. 重载插件（或在维护窗口重启 AstrBot），执行 `/router status` 确认版本 `0.6.1`。
-3. 保持已保存的 Low=2、Mid=7，临时打开 debug，用测试会话核对评分 2→Low、3→Mid、7→Mid、8→High；以日志中实际分析出的分数为准，自然语言问题并不保证模型输出固定分数。
-4. 检查日志的目标 provider/model，并结合服务商请求记录核验实际模型调用。测试后关闭 debug；注意真实路由分析会产生额外模型请求及费用。
+2. 重载插件（或在维护窗口重启 AstrBot）并刷新配置页面，确认 22 个独立模型名输入框已删除；执行 `/router status` 确认版本 `0.6.2`。
+3. 检查路由、等级默认及分类规则中的 Chat Provider 选择是否包含预期模型；曾依赖独立模型名覆盖的配置需要重新选择对应条目。
+4. 保持已保存的 Low=2、Mid=7，临时打开 debug，用测试会话核对评分 2→Low、3→Mid、7→Mid、8→High；以日志中实际分析出的分数为准，自然语言问题并不保证模型输出固定分数。
+5. 检查日志和 `/router config` 的完整目标 Chat Provider ID，并结合服务商请求记录核验实际模型调用。测试后关闭 debug；注意真实路由分析会产生额外模型请求及费用。
 
 本仓库提供修复代码，不会自动覆盖服务器文件、重启服务或更改线上配置。
 
@@ -208,7 +225,6 @@ sequenceDiagram
             Plugin->>Plugin: 匹配 Tier 规则
             Note over Plugin: 💉 关键：注入决策
             Plugin->>Plugin: event.set_extra("selected_provider", ...)
-            Plugin->>Plugin: event.set_extra("selected_model", ...)
         end
     end
     

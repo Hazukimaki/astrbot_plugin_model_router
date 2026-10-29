@@ -14,7 +14,6 @@ class CacheMutationTests(unittest.IsolatedAsyncioTestCase):
         plugin, _, provider, targets = fixture(cfg)
         targets["router-secondary"] = provider
         changes = [
-            ("router_config", "router_model", "changed-model"),
             ("router_config", "router_provider", "router-secondary"),
             ("router_config", "router_manual_prompt", "JSON: {categories} {valid_cats_json}"),
             ("tier_low", "r1_desc", "Updated category definition"),
@@ -26,7 +25,21 @@ class CacheMutationTests(unittest.IsolatedAsyncioTestCase):
                 cfg[section][key] = value
                 await plugin.router.analyze_intent("identical input")
                 self.assertEqual(provider.text_chat.await_count, count)
-        self.assertEqual(provider.text_chat.await_args.kwargs["model"], "changed-model")
+        self.assertNotIn("model", provider.text_chat.await_args.kwargs)
+
+    async def test_legacy_model_changes_do_not_invalidate_cache(self):
+        cfg = defaults()
+        plugin, _, provider, _ = fixture(cfg)
+        await plugin.router.analyze_intent("identical input")
+        self.assertEqual(provider.text_chat.await_count, 1)
+
+        # Changing retired model fields must NOT cause cache invalidation
+        cfg["router_config"]["router_model"] = "new-legacy-router-model"
+        cfg["tier_low"]["global_model"] = "new-legacy-global-model"
+        cfg["tier_high"]["r1_model"] = "new-legacy-r1-model"
+
+        await plugin.router.analyze_intent("identical input")
+        self.assertEqual(provider.text_chat.await_count, 1, "Legacy model key changes should not invalidate cache")
 
     async def test_removed_provider_cannot_serve_cached_analysis(self):
         plugin, _, provider, targets = fixture()
@@ -81,8 +94,9 @@ class ReleaseContractTests(unittest.IsolatedAsyncioTestCase):
         event = Event(text="/router status")
         event.plain_result = lambda text: text
         status = await plugin.router_command(event)
-        self.assertEqual(main.PLUGIN_VERSION, "0.6.1")
+        self.assertEqual(main.PLUGIN_VERSION, "0.6.2")
         self.assertIn("Version: " + main.PLUGIN_VERSION, status)
+        self.assertIn("Router Chat Provider: router", status)
         metadata = (PLUGIN_ROOT / "metadata.yaml").read_text(encoding="utf-8")
         self.assertIn("version: v" + main.PLUGIN_VERSION, metadata.splitlines())
         self.assertIn("repo: https://github.com/Hazukimaki/astrbot_plugin_model_router", metadata.splitlines())
