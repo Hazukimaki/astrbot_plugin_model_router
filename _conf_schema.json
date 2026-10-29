@@ -17,7 +17,7 @@
             "debug_target_sid": {
                 "type": "string",
                 "description": "Debug 信息接收会话 (Debug Target SID)",
-                "hint": "接收 debug 信息的会话 ID (格式: 平台:类型:ID)。留空则在当前会话追加发送。",
+                "hint": "接收 debug 信息的会话 ID (格式: 平台:类型:ID)。留空则仅记录到日志，不发送调试消息。",
                 "default": ""
             },
             "router_provider": {
@@ -61,7 +61,7 @@
             "max_score": {
                 "type": "int",
                 "description": "评分范围上限 (Max Score)",
-                "hint": "路由模型会给用户消息打分 (1-10)。如果分数 <= 此值 (且 >= 1)，将进入 Low Tier 寻找匹配规则。",
+                "hint": "路由模型会给用户消息打分 (1-9)。如果分数 <= 此值 (且 >= 1)，将进入 Low Tier 寻找匹配规则。请设置 Low Max Score < Mid Max Score。",
                 "default": 3
             },
             "global_provider": {

@@ -8,6 +8,14 @@
 
 ## 📋 更新日志 (Changelog)
 
+### v0.6.1 (2026-10-29)
+- 🐛 **配置阈值真正生效**：实际分档改为读取 `tier_low.max_score` / `tier_mid.max_score`，不再写死 3/6。缺省值与配置 schema 统一为 3/7，已有配置原样保留。
+- 🐛 **完整替换提示词占位符**：支持 `{categories}`、`{valid_cats_json}`、`{task_snapshots}`，类别列表通过 JSON 序列化生成，保留提示词中普通 JSON 花括号。
+- 🐛 **上下文轮数与字符限制生效**：按 `context_turns × 2` 读取消息，移除固定 6 条及每条 200 字符的限制；`context_max_chars=0` 不截断；`context_turns=0` 不读取历史，也不携带旧任务快照。
+- 🐛 **避免陈旧缓存**：缓存键纳入全部有效上下文、活跃任务快照与路由/分类配置，切换模型、提示词或任务后重新分析，保留原有 TTL/LRU 上限。
+- 📝 **版本与 fork 信息一致**：插件注册、元数据和 `/router status` 统一为 0.6.1；本 fork 的更新地址指向 Hazukimaki 仓库。原作者仍为 Antigravity，上游来源为 <https://github.com/yukikazechan/astrbot_plugin_model_router>。
+- 🧪 **离线回归测试**：新增标准库 unittest，覆盖上述修复及 JSON 解析、缓存、分类兜底、会话过滤、异常处理等原有行为；不依赖真实模型服务。
+
 ### v0.6.0 (2025-12-15)
 - ✨ **任务快照系统**: 支持多任务上下文追踪，AI 可在多个活跃任务间智能选择延续哪个
 - ✨ **多维度难度评分**: 针对 code/math/roleplay/chat 等不同维度提供独立的评分标准
@@ -20,9 +28,10 @@
 
 *   **🧠 智能意图识别**: 自动分析用户输入是闲聊、代码、角色扮演、数学问题还是其他自定义类别。
 *   **⚖️ 难度分级路由**: 
-    *   **🟢 Low Tier (1-3分)**: 简单问候、天气查询 -> 路由到轻量模型。
-    *   **🟡 Mid Tier (4-6分)**: 常规逻辑、文案生成 -> 路由到标准模型。
-    *   **🔴 High Tier (7-9分)**: 复杂推理、深度编程 -> 路由到高性能模型。
+    *   **🟢 Low Tier (默认1-3分)**: 简单问候、天气查询 -> 路由到轻量模型。
+    *   **🟡 Mid Tier (默认4-7分)**: 常规逻辑、文案生成 -> 路由到标准模型。
+    *   **🔴 High Tier (默认8-9分)**: 复杂推理、深度编程 -> 路由到高性能模型。
+    *   以上为缺省边界；保存的 `max_score` 配置决定实际分档，不会因升级被重置。
 *   **📝 上下文感知**: 路由判断时会参考最近的对话历史，避免因上下文缺失导致的误判。
 *   **🛡️ 会话黑/白名单**: 支持针对特定群组或用户开启/关闭路由功能。
 *   **⚙️ 高度可配置**: 支持自定义分类规则、难度阈值、提示词模板。
@@ -46,7 +55,9 @@
 | `router_config.router_provider` | string | - | **(必须)** 负责分析意图的路由模型服务商。建议使用响应快、便宜的小模型。 |
 | `router_config.router_model` | string | - | 指定路由使用的具体模型名称 (留空则用默认)。 |
 | `router_config.debug_mode` | bool | `false` | 开启后，会在控制台或指定会话显示详细的路由分析日志。 |
-| `router_config.context_turns` | int | `4` | 路由判断时参考的对话轮数 (1轮=一问一答)，同时控制任务快照的有效期。 |
+| `router_config.context_turns` | int | `4` | 路由判断时参考的对话轮数 (1轮=一问一答)，同时控制任务快照的有效期。0 表示仅当前消息、不使用历史或旧任务快照。 |
+| `router_config.debug_target_sid` | string | 空 | 指定接收调试信息的会话；留空只记录日志，不在当前会话追加发送。 |
+| `router_config.router_manual_prompt` | text | 内置模板 | 支持 `{categories}`、`{valid_cats_json}`、`{task_snapshots}`；不要用通用格式化函数处理其中的 JSON 花括号。 |
 | `router_config.context_max_chars` | int | `500` | 每条上下文消息的最大字符数。设置 0 表示不截断。 |
 
 ### 2. 等级框架 (Three Tiers)
@@ -56,8 +67,20 @@
 | 等级 | 适用场景 | 关键配置 |
 | :--- | :--- | :--- |
 | **🟢 Low Tier** | 闲聊、简单指令、单一工具调用 | **Max Score (默认3)**: 分数 <= 此值进入 Low Tier。<br>**Global Model**: 此等级的默认模型。<br>**Rules (r1-r6)**: 针对特定分类 (如 math, chat) 指定模型。 |
-| **🟡 Mid Tier** | 一般逻辑、多步任务、文档摘要 | **Max Score (默认6)**: 分数 <= 此值 (且 > Low) 进入 Mid Tier。<br>**Global Model**: 此等级的默认模型。 |
+| **🟡 Mid Tier** | 一般逻辑、多步任务、文档摘要 | **Max Score (默认7)**: 分数 <= 此值 (且 > Low) 进入 Mid Tier。<br>**Global Model**: 此等级的默认模型。 |
 | **🔴 High Tier** | 复杂代码、深度推理、创意写作 | **Global Model**: 此等级的默认模型 (通常配置为最强模型)。<br>**Rules (r1-r6)**: 同样可针对分类指定模型。 |
+
+**实际分档公式**：`score <= low.max_score` → Low；`low.max_score < score <= mid.max_score` → Mid；`score > mid.max_score` → High。建议满足 `1 <= Low Max Score < Mid Max Score <= 9`。
+
+例如保存 `tier_low.max_score=2`、`tier_mid.max_score=7` 时：
+
+| 分数 | 路由等级 |
+| :--- | :--- |
+| 1、2 | Low |
+| 3～7 | Mid |
+| 8、9 | High |
+
+**升级注意**：旧实现无论配置如何都按 3/6 分档；v0.6.1 开始遵从保存的值。若希望保留旧行为，请显式保存 Low=3、Mid=6；不必清空或重新填写已有服务商配置。
 
 **规则 (Rules) 配置说明:**
 每个 Tier 下可以配置 r1 到 r6 六组规则，每组规则包含：
@@ -88,6 +111,25 @@
 | `/router remove [sid]` | 将当前会话 (或指定SID) 从名单中移除。 | `/router remove` |
 
 ---
+
+## 🧪 开发与离线验证
+
+在插件仓库根目录执行（仅需 Python 3.10+ 标准库）：
+
+```bash
+python -B -m unittest discover -s tests -v
+```
+
+测试用最小 AstrBot API 替身导入真实插件源文件，并模拟模型响应；不会安装 AstrBot、调用模型或发送平台消息。通过离线测试不等于真实 AstrBot 版本兼容、调度或模型切换的端到端验证。
+
+### 更新后的服务端核验
+
+1. 备份插件配置，在测试实例中更新至此版本，确认代码来源是自己的 fork/修复分支。
+2. 重载插件（或在维护窗口重启 AstrBot），执行 `/router status` 确认版本 `0.6.1`。
+3. 保持已保存的 Low=2、Mid=7，临时打开 debug，用测试会话核对评分 2→Low、3→Mid、7→Mid、8→High；以日志中实际分析出的分数为准，自然语言问题并不保证模型输出固定分数。
+4. 检查日志的目标 provider/model，并结合服务商请求记录核验实际模型调用。测试后关闭 debug；注意真实路由分析会产生额外模型请求及费用。
+
+本仓库提供修复代码，不会自动覆盖服务器文件、重启服务或更改线上配置。
 
 ## 🎨 技术实现 (Technical Implementation)
 

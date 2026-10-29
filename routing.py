@@ -19,11 +19,41 @@ class IntentRouter:
         self.config = config
         self._cache: OrderedDict[str, tuple] = OrderedDict()  # key -> (result, timestamp)
 
-    def _get_cache_key(self, text: str, contexts: List) -> str:
-        """Generate cache key from text and recent context."""
-        # 只使用最近2条上下文生成key，避免上下文变化导致缓存失效
-        ctx_str = str(contexts[-2:]) if contexts else ""
-        return hashlib.md5(f"{text}:{ctx_str}".encode()).hexdigest()
+    def _prepare_contexts(self, contexts: List) -> List[Dict[str, str]]:
+        """Apply configured history limits once, also for direct router calls."""
+        router_config = self.config.get("router_config", {})
+        turns = max(0, router_config.get("context_turns", 4))
+        if turns == 0:
+            return []
+        max_chars = max(0, router_config.get("context_max_chars", 500))
+        prepared = []
+        for msg in (contexts or [])[-turns * 2:]:
+            if isinstance(msg, dict):
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+            elif isinstance(msg, str):
+                role, content = "unknown", msg
+            else:
+                continue
+            content = "" if content is None else str(content)
+            if max_chars > 0:
+                content = content[:max_chars]
+            if content:
+                prepared.append({"role": role, "content": content})
+        return prepared
+
+    def _get_cache_key(self, text: str, contexts: List, task_snapshots: List = None) -> str:
+        """Include every input that can change the routing decision."""
+        turns = max(0, self.config.get("router_config", {}).get("context_turns", 4))
+        payload = {
+            "text": text,
+            "contexts": self._prepare_contexts(contexts),
+            "task_snapshots": (task_snapshots or []) if turns > 0 else [],
+            "config": {key: self.config.get(key, {}) for key in
+                       ("router_config", "tier_low", "tier_mid", "tier_high")},
+        }
+        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     
     def _get_cached(self, key: str) -> Optional[Dict[str, Any]]:
         """Get cached result if valid (not expired)."""
@@ -62,19 +92,13 @@ class IntentRouter:
         if task_snapshots is None:
             task_snapshots = []
         
-        # --- 缓存检查 ---
-        cache_key = self._get_cache_key(user_text, contexts)
-        cached = self._get_cached(cache_key)
-        if cached is not None:
-            logger.debug(f"Router cache hit for: {user_text[:30]}...")
-            return cached
-            
         router_config = self.config.get("router_config", {})
         provider_id = router_config.get("router_provider")
         router_model = router_config.get("router_model", "")
         
-        # How many recent messages to include for context (configurable, default 4)
-        context_limit = router_config.get("context_turns", 4)
+        contexts = self._prepare_contexts(contexts)
+        if router_config.get("context_turns", 4) <= 0:
+            task_snapshots = []
         
         logger.debug(f"Router Config: Provider={provider_id}, Model={router_model}")
 
@@ -86,6 +110,14 @@ class IntentRouter:
         if not provider:
             logger.error(f"Router provider not found: {provider_id}")
             return None
+
+        # Validate the provider before cache lookup so a removed provider cannot
+        # silently reuse a result. Snapshot/config/history changes invalidate it.
+        cache_key = self._get_cache_key(user_text, contexts, task_snapshots)
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            logger.debug(f"Router cache hit for: {user_text[:30]}...")
+            return cached
 
         # --- Build Dynamic System Prompt from Frames (Fixed Slots) ---
         
@@ -122,33 +154,13 @@ class IntentRouter:
         for name, desc in final_cat_map.items():
             cat_lines.append(f'- "{name}": {desc}')
         cat_section = "\n".join(cat_lines)
-        valid_cats_json = str(list(final_cat_map.keys())).replace("'", '"')
-
-        # Get Thresholds
-        t_low = self.config.get("tier_low", {}).get("max_score", 3)
-        t_mid = self.config.get("tier_mid", {}).get("max_score", 7)
+        valid_cats_json = json.dumps(list(final_cat_map), ensure_ascii=False)
         
         # --- Format conversation context ---
         context_section = ""
-        if contexts and len(contexts) > 0:
-            # context_turns is number of rounds (1 round = user + assistant), so multiply by 2 for messages
-            message_limit = context_limit * 2
-            recent_contexts = contexts[-message_limit:] if len(contexts) > message_limit else contexts
-            context_lines = []
-            for msg in recent_contexts:
-                # Handle both dict format and string format
-                if isinstance(msg, dict):
-                    role = msg.get("role", "user")
-                    content = msg.get("content", "")[:200]  # Truncate long messages
-                elif isinstance(msg, str):
-                    role = "unknown"
-                    content = msg[:200]
-                else:
-                    continue  # Skip invalid format
-                if content:
-                    context_lines.append(f"[{role}]: {content}")
-            if context_lines:
-                context_section = "\n\nRecent Conversation Context:\n" + "\n".join(context_lines)
+        if contexts:
+            context_lines = [f"[{msg['role']}]: {msg['content']}" for msg in contexts]
+            context_section = "\n\nRecent Conversation Context:\n" + "\n".join(context_lines)
         
         # --- Build task snapshots section ---
         snapshots_section = ""
@@ -225,6 +237,9 @@ For user-defined categories, follow general principles:
 3. When context_relation is "continue", difficulty_score MUST match the continued task's score
 4. Pure chit-chat, greetings, thanks should be 1-2
 """
+
+        # Replace only named placeholders, not JSON braces in custom prompts.
+        system_prompt = system_prompt.replace("{valid_cats_json}", valid_cats_json)
 
         # 替换任务快照占位符
         if "{task_snapshots}" in system_prompt:

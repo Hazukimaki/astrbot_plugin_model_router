@@ -8,12 +8,14 @@ from astrbot.core.provider.entities import ProviderRequest
 
 from .routing import IntentRouter
 
+PLUGIN_VERSION = "0.6.1"
+
 @register(
     "astrbot_plugin_model_router",
     "Antigravity",
     "基于意图识别的多模型路由插件",
-    "0.5.0",
-    "https://github.com/AstrBot-Plugins/astrbot_plugin_model_router" 
+    PLUGIN_VERSION,
+    "https://github.com/Hazukimaki/astrbot_plugin_model_router"
 )
 class ModelRouterPlugin(Star):
     def __init__(self, context: Context, config: dict):
@@ -68,32 +70,26 @@ class ModelRouterPlugin(Star):
             if not user_text:
                 return
             
-            # Get recent context from conversation if available
+            # Zero turns must not even read conversation history. The router
+            # applies the same message/character limits to all entry points.
+            context_turns = max(0, self.config.get("router_config", {}).get("context_turns", 4))
             contexts = []
-            try:
-                conv_mgr = self.context.conversation_manager
-                umo = event.unified_msg_origin
-                cid = await conv_mgr.get_curr_conversation_id(umo)
-                if cid:
-                    conv = await conv_mgr.get_conversation(umo, cid)
-                    if conv and conv.messages:
-                        # Get max chars setting (0 = no truncation)
-                        max_chars = self.config.get("router_config", {}).get("context_max_chars", 500)
-                        # Get last few messages for context
-                        for msg in conv.messages[-6:]:
-                            content = str(msg.content)
-                            if max_chars > 0:
-                                content = content[:max_chars]
-                            contexts.append({"role": msg.role, "content": content})
-            except Exception as e:
-                logger.debug(f"Could not get conversation context: {e}")
+            if context_turns > 0:
+                try:
+                    conv_mgr = self.context.conversation_manager
+                    umo = event.unified_msg_origin
+                    cid = await conv_mgr.get_curr_conversation_id(umo)
+                    if cid:
+                        conv = await conv_mgr.get_conversation(umo, cid)
+                        if conv and conv.messages:
+                            for msg in conv.messages[-context_turns * 2:]:
+                                contexts.append({"role": msg.role, "content": str(msg.content)})
+                except Exception as e:
+                    logger.debug(f"Could not get conversation context: {e}")
             
             # === 获取任务快照 ===
             sid = event.unified_msg_origin
             session_snapshots = self.task_snapshots.get(sid, {})
-            
-            # 获取配置的上下文轮数
-            context_turns = self.config.get("router_config", {}).get("context_turns", 4)
             
             # 清理过期快照 (基于轮数，而非时间)
             # 每个快照有 turn_count，每次对话后递增
@@ -157,7 +153,7 @@ class ModelRouterPlugin(Star):
                 logger.info(f"🆕 Context UNRELATED: Independent score {final_score}")
             
             # === 更新快照 (仅当 score >= 4 且非纯闲聊) ===
-            if final_score >= 4:
+            if context_turns > 0 and final_score >= 4:
                 # 生成新的 task_id
                 task_id = f"task_{int(time.time()) % 10000}"
                 # 从用户输入生成简短摘要
@@ -279,10 +275,12 @@ class ModelRouterPlugin(Star):
         
     def get_target_config(self, category: str, difficulty: int):
         """Get target provider and model based on category and difficulty."""
-        # Determine tier based on difficulty
-        if difficulty <= 3:
+        # Match the configured boundaries (including existing saved settings).
+        t_low = self.config.get("tier_low", {}).get("max_score", 3)
+        t_mid = self.config.get("tier_mid", {}).get("max_score", 7)
+        if difficulty <= t_low:
             curr_tier = "low"
-        elif difficulty <= 6:
+        elif difficulty <= t_mid:
             curr_tier = "mid"
         else:
             curr_tier = "high"
@@ -420,7 +418,7 @@ class ModelRouterPlugin(Star):
                 f"- Enabled: {'Yes' if enabled else 'No'}\n"
                 f"- Debug: {'On' if debug else 'Off'}\n"
                 f"- Router LLM: {router_provider}:{router_model}\n"
-                f"- Version: 0.5.1"
+                f"- Version: {PLUGIN_VERSION}"
             )
         
         elif sub_cmd == "list":
